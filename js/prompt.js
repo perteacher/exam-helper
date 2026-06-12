@@ -1,12 +1,10 @@
 // prompt.js — 프롬프트 조립 엔진
 // 가이드라인 JSON + 사용자 입력 → system 프롬프트 조립 (스펙 §5)
 
-function buildGenerationPrompt(guideline, userInput) {
+// 가이드라인 컨텍스트 섹션(기본 정보/용어 규정/출제 불가/추가 출제 가능)을 lines에 추가.
+// 생성·검토 프롬프트가 동일한 교육과정 제약을 공유하도록 재사용 (스펙 §5)
+function pushGuidelineContext(lines, guideline) {
   const meta = guideline.meta || {};
-  const lines = [];
-
-  lines.push("당신은 한국 중학교 과학 정기고사 출제를 돕는 전문 보조자입니다.");
-  lines.push("");
 
   // [기본 정보]
   lines.push("[기본 정보]");
@@ -32,6 +30,15 @@ function buildGenerationPrompt(guideline, userInput) {
   lines.push("다음 내용은 추가로 출제할 수 있습니다.");
   (guideline.extra || []).forEach((e) => lines.push("- " + e));
   lines.push("");
+}
+
+function buildGenerationPrompt(guideline, userInput) {
+  const lines = [];
+
+  lines.push("당신은 한국 중학교 과학 정기고사 출제를 돕는 전문 보조자입니다.");
+  lines.push("");
+
+  pushGuidelineContext(lines, guideline);
 
   // [난이도 상 전용] — difficulty가 "상"일 때만 포함
   const isAdvanced = userInput.difficulty === "상";
@@ -91,7 +98,51 @@ function parseGenerationResponse(text) {
   return { ok: false, raw: text };
 }
 
-// TODO(M3): 검토 모드 프롬프트 (판정 첫 줄 규칙 + 악마의 변호인 모드)
-function buildReviewPrompt(guideline, options) {
-  throw new Error("M3에서 구현 예정");
+// 검토 모드 프롬프트 (스펙 §4 탭2 + §5 검토 모드)
+// - 응답은 마크다운 텍스트 (JSON 아님)
+// - 첫 줄에 "오류 없음" / "오류 있음" 판정 강제, 이어서 근거, 마지막에 개선 제안(선택)
+// - devilsAdvocate=true 시 이의제기 시뮬레이션(악마의 변호인) 관점으로 전환
+function buildReviewPrompt(guideline, questionText, devilsAdvocate) {
+  const lines = [];
+
+  lines.push("당신은 한국 중학교 과학 정기고사 문항을 검토하는 전문 보조자입니다.");
+  lines.push("아래 교육과정 제약(용어 규정·출제 불가 등)을 기준으로 문항의 오류를 엄정하게 검토합니다.");
+  lines.push("");
+
+  // 동일한 가이드라인 컨텍스트 재사용 (생성과 일관)
+  pushGuidelineContext(lines, guideline);
+
+  // [난이도 상 전용] — 검토에서는 심화 허용 범위 파악을 위해 항상 제공
+  if ((guideline.advanced || []).length) {
+    lines.push("[난이도 상 전용]");
+    lines.push("다음은 난이도 '상' 문항에서만 허용되는 심화 내용입니다.");
+    (guideline.advanced || []).forEach((a) => lines.push("- " + a));
+    lines.push("");
+  }
+
+  // [검토 관점]
+  if (devilsAdvocate) {
+    lines.push("[검토 관점 — 악마의 변호인 모드]");
+    lines.push("학생 또는 학부모가 이 문항에 이의를 제기한다고 가정하고, 이의제기 시뮬레이션 관점으로 검토하십시오.");
+    lines.push("정답 시비, 보기의 모호성, 복수 정답 가능성, 발문 해석의 여지 등 논쟁의 소지가 있는 모든 지점을 빠짐없이 들추어 내십시오.");
+    lines.push("이의제기에 타당한 근거가 하나라도 있으면 판정은 '오류 있음'입니다.");
+  } else {
+    lines.push("[검토 관점]");
+    lines.push("용어 규정 위반, 출제 불가 내용 포함, 사실 오류, 복수 정답·정답 없음, 발문의 모호성을 중심으로 검토하십시오.");
+  }
+  lines.push("");
+
+  // [검토 대상 문항]
+  lines.push("[검토 대상 문항]");
+  lines.push(questionText || "(문항 없음)");
+  lines.push("");
+
+  // [출력 형식] — 마크다운 텍스트, 판정 첫 줄 규칙 강제
+  lines.push("[출력 형식]");
+  lines.push("JSON이 아닌 마크다운 텍스트로 응답하십시오.");
+  lines.push('첫 줄은 반드시 "오류 없음" 또는 "오류 있음" 중 하나의 판정만 단독으로 적으십시오. 다른 문구를 덧붙이지 마십시오.');
+  lines.push("둘째 줄부터 판정의 근거를 구체적으로 서술하고, 마지막에 개선 제안을 선택적으로 덧붙이십시오.");
+  lines.push("오류가 없는데 있는 것처럼 암시하는 표현 금지: 실제 오류가 없으면 망설이거나 에둘러 말하지 말고 '오류 없음'이라고 분명히 밝히십시오.");
+
+  return lines.join("\n");
 }

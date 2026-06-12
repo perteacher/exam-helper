@@ -299,6 +299,86 @@ function section(label, value) {
   return `<div class="q-sec"><span class="q-label">${label}</span><div class="q-text">${escapeHtml(value)}</div></div>`;
 }
 
+// ---------- 탭 2: 문항 검토 ----------
+function initReview() {
+  const btn = $("#review-btn");
+  btn.disabled = false;
+  btn.removeAttribute("title");
+  btn.textContent = "검토하기";
+  btn.addEventListener("click", runReview);
+}
+
+// 응답 첫 비어있지 않은 줄을 판정으로 파싱
+function parseVerdict(text) {
+  const lines = String(text).split("\n");
+  const first = (lines.find((l) => l.trim()) || "").trim();
+  if (first.includes("오류 없음")) return "clean";
+  if (first.includes("오류 있음")) return "error";
+  return "unknown";
+}
+
+async function runReview() {
+  const output = $("#review-output");
+  const btn = $("#review-btn");
+
+  const questionText = ($("#review-input").value || "").trim();
+  if (!questionText) {
+    output.innerHTML = '<p class="placeholder">검토할 문항을 먼저 붙여넣어 주세요.</p>';
+    return;
+  }
+
+  const apiKey = Store.getApiKey();
+  if (!apiKey) {
+    output.innerHTML = '<p class="placeholder">API 키가 설정되지 않았습니다. 우측 상단 ⚙ 설정에서 키를 먼저 입력해 주세요.</p>';
+    return;
+  }
+
+  const guideline = currentGuideline();
+  if (!guideline) {
+    output.innerHTML = '<p class="placeholder">단원(가이드라인)을 먼저 선택해 주세요.</p>';
+    return;
+  }
+
+  const devil = !!$("#review-devil").checked;
+  const system = buildReviewPrompt(guideline, questionText, devil);
+  const model = Store.getModel() || DEFAULT_MODEL;
+
+  btn.disabled = true;
+  btn.textContent = "검토 중...";
+  output.innerHTML = '<p class="placeholder">문항을 검토하고 있습니다...</p>';
+
+  try {
+    const res = await callClaude({
+      apiKey,
+      model,
+      system,
+      messages: [{ role: "user", content: "위 문항을 검토해 주세요." }]
+    });
+    const text = res?.content?.map((b) => b.text || "").join("") || "";
+    renderReviewResult(text, devil);
+  } catch (e) {
+    output.innerHTML = '<p class="placeholder">' + (e.message || "요청에 실패했습니다.") + "</p>";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "검토하기";
+  }
+}
+
+// 판정 배지 + 마크다운 본문(줄바꿈 보존) 렌더링
+function renderReviewResult(text, devil) {
+  const output = $("#review-output");
+  const verdict = parseVerdict(text);
+  const labels = { clean: "오류 없음", error: "오류 있음", unknown: "판정 미상" };
+
+  let html = '<div class="review-head">';
+  html += `<span class="verdict-badge ${verdict}">${labels[verdict]}</span>`;
+  if (devil) html += '<span class="devil-tag">악마의 변호인 모드</span>';
+  html += "</div>";
+  html += `<div class="review-body">${escapeHtml(text).replace(/\n/g, "<br>")}</div>`;
+
+  output.innerHTML = html;
+}
+
 function escapeHtml(s) {
   return String(s)
     .replace(/&/g, "&amp;")
@@ -337,5 +417,6 @@ document.addEventListener("DOMContentLoaded", () => {
   initTabs();
   initSettings();
   initGenerate();
+  initReview();
   loadUnits();
 });
