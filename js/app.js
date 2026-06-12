@@ -12,6 +12,15 @@ function currentGuideline() {
 
 const $ = (sel) => document.querySelector(sel);
 
+// ---------- 온보딩 패널 ----------
+// API 키가 없을 때만 탭1 상단에 안내 패널 노출. 키가 있으면 숨김.
+// 호출 시점: 최초 로드 + 설정 저장 성공 직후.
+function updateOnboarding() {
+  const panel = $("#onboarding");
+  if (!panel) return;
+  panel.hidden = !!Store.getApiKey();
+}
+
 // ---------- 탭 전환 ----------
 function initTabs() {
   document.querySelectorAll(".tab-btn").forEach((btn) => {
@@ -63,6 +72,7 @@ function initSettings() {
       Store.setModel(model);
       status.textContent = "검증 성공 — 설정이 저장되었습니다.";
       status.className = "status ok";
+      updateOnboarding(); // 키 저장 후 온보딩 패널 숨김
     } catch (e) {
       status.textContent = "검증 실패 — " + e.message;
       status.className = "status error";
@@ -243,6 +253,10 @@ function renderGenerationResult(parsed, meta) {
   output.innerHTML = "";
 
   if (!parsed.ok) {
+    const note = document.createElement("p");
+    note.className = "placeholder raw-note";
+    note.textContent = "응답을 카드로 변환하지 못해 원문을 표시합니다.";
+    output.appendChild(note);
     const pre = document.createElement("pre");
     pre.className = "raw-fallback";
     pre.textContent = parsed.raw;
@@ -576,5 +590,6 @@ document.addEventListener("DOMContentLoaded", () => {
   initGenerate();
   initReview();
   initGuidelines();
+  updateOnboarding();
   loadUnits();
 });

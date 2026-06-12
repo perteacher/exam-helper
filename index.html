@@ -24,6 +24,20 @@
   <main>
     <!-- 탭 1: 문항 생성 -->
     <section id="tab-generate" class="tab-panel active">
+      <div id="onboarding" class="onboarding" hidden>
+        <h2>출제연구소에 오신 것을 환영합니다</h2>
+        <p>2022 개정 교육과정에 맞춰 중학교 과학 문항을 생성·검토하는 도구입니다.</p>
+        <p class="onboarding-cta">시작하려면 우측 상단 ⚙ 설정에서 Anthropic API 키를 입력하세요.
+          <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">API 키 발급받기</a>
+        </p>
+        <ol class="onboarding-steps">
+          <li>① 단원 선택</li>
+          <li>② 문항 유형·난이도 선택</li>
+          <li>③ [문항 생성] 클릭</li>
+        </ol>
+        <p class="onboarding-note">붙여넣은 문항을 검토하려면 상단 <strong>문항 검토</strong> 탭을 이용하세요.</p>
+        <p class="onboarding-note">API 키는 이 브라우저에만 저장되며 서버로 전송되지 않습니다.</p>
+      </div>
       <div class="form-grid">
         <label>문항 유형
           <select id="gen-type">
