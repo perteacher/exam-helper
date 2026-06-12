@@ -74,8 +74,9 @@
     <!-- 탭 3: 가이드라인 관리 -->
     <section id="tab-guidelines" class="tab-panel">
       <div class="toolbar">
-        <button disabled title="M4에서 구현 예정">새 가이드라인 만들기 (준비 중)</button>
-        <button disabled title="M4에서 구현 예정">JSON 가져오기 (준비 중)</button>
+        <button id="new-guideline-btn" class="primary">새 가이드라인 만들기</button>
+        <button id="import-guideline-btn">JSON 가져오기</button>
+        <input type="file" id="import-file" accept=".json,application/json" hidden />
       </div>
       <div id="guideline-list"></div>
     </section>
@@ -97,6 +98,39 @@
     <div class="modal-actions">
       <button id="settings-save" class="primary">저장</button>
       <button id="settings-close">닫기</button>
+    </div>
+  </dialog>
+
+  <!-- 가이드라인 폼 모달 -->
+  <dialog id="guideline-modal">
+    <h2 id="gl-modal-title">새 가이드라인 만들기</h2>
+    <div class="form-grid">
+      <label>학년
+        <input type="text" id="gl-grade" placeholder="예: 중2" />
+      </label>
+      <label>단원 <span class="req">*</span>
+        <input type="text" id="gl-unit" placeholder="예: Ⅵ. 동물과 에너지 — 호흡계·배설계" />
+      </label>
+      <label>교육과정
+        <input type="text" id="gl-curriculum" placeholder="2022 개정" />
+      </label>
+    </div>
+    <label class="block-label">용어 규정 <small>(한 줄에 하나씩)</small>
+      <textarea id="gl-terms" rows="4" placeholder="허파꽈리 (폐포 ✗)&#10;숨관 (기관 ✗)"></textarea>
+    </label>
+    <label class="block-label">출제 불가 <small>(한 줄에 하나씩)</small>
+      <textarea id="gl-forbidden" rows="3"></textarea>
+    </label>
+    <label class="block-label">추가 출제 가능 <small>(한 줄에 하나씩)</small>
+      <textarea id="gl-extra" rows="3"></textarea>
+    </label>
+    <label class="block-label">난이도 상 전용 <small>(한 줄에 하나씩)</small>
+      <textarea id="gl-advanced" rows="3"></textarea>
+    </label>
+    <p id="gl-status" class="status"></p>
+    <div class="modal-actions">
+      <button id="gl-save" class="primary">저장</button>
+      <button id="gl-close">취소</button>
     </div>
   </dialog>
 

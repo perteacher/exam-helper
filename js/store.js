@@ -25,6 +25,32 @@ const Store = {
     }
   },
 
+  setUserGuidelines(list) {
+    localStorage.setItem(this.KEYS.userGuidelines, JSON.stringify(list));
+  },
+
+  // 사용자 가이드라인 추가 (push + 저장)
+  addUserGuideline(g) {
+    const list = this.getUserGuidelines();
+    list.push(g);
+    this.setUserGuidelines(list);
+    return g;
+  },
+
+  // id로 교체 (없으면 추가)
+  updateUserGuideline(g) {
+    const list = this.getUserGuidelines();
+    const i = list.findIndex((x) => x.id === g.id);
+    if (i >= 0) list[i] = g; else list.push(g);
+    this.setUserGuidelines(list);
+    return g;
+  },
+
+  // id로 삭제
+  deleteUserGuideline(id) {
+    this.setUserGuidelines(this.getUserGuidelines().filter((x) => x.id !== id));
+  },
+
   getHistory() {
     try {
       return JSON.parse(localStorage.getItem(this.KEYS.history)) || [];

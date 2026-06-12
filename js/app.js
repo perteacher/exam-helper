@@ -72,6 +72,9 @@ function initSettings() {
 
 // ---------- 단원 로딩 ----------
 async function loadUnits() {
+  // 새로고침 시 중복 방지: 상태를 먼저 비운다 (push 누적 방지)
+  state.units = [];
+  state.guidelines = {};
   try {
     const res = await fetch("data/guidelines/index.json");
     const index = await res.json();
@@ -104,7 +107,11 @@ async function loadUnits() {
   if (saved && state.guidelines[saved]) select.value = saved;
   Store.setSelectedUnit(select.value);
 
-  select.addEventListener("change", () => Store.setSelectedUnit(select.value));
+  // 리스너 1회만 등록 (loadUnits는 CRUD 후 반복 호출됨)
+  if (!select.dataset.bound) {
+    select.addEventListener("change", () => Store.setSelectedUnit(select.value));
+    select.dataset.bound = "1";
+  }
 
   renderGuidelineList();
 }
@@ -117,16 +124,41 @@ function renderGuidelineList() {
     const g = state.guidelines[u.id];
     const card = document.createElement("div");
     card.className = "guideline-card";
-    card.innerHTML = `
-      <div class="card-head">
-        <strong>${g.meta?.unit || u.label}</strong>
-        <span class="badge">${u.builtin ? "내장" : "사용자"}</span>
-      </div>
-      <p class="card-meta">${g.meta?.grade || ""} · ${g.meta?.curriculum || ""}</p>
-      <p class="card-meta">용어 규정 ${g.terms?.length || 0} · 출제 불가 ${g.forbidden?.length || 0} · 추가 출제 가능 ${g.extra?.length || 0} · 난이도 상 전용 ${g.advanced?.length || 0}</p>
-    `;
+
+    const head = document.createElement("div");
+    head.className = "card-head";
+    head.innerHTML =
+      `<strong>${escapeHtml(g.meta?.unit || u.label)}</strong>` +
+      `<span class="badge">${u.builtin ? "내장" : "사용자"}</span>`;
+    card.appendChild(head);
+
+    const meta = document.createElement("div");
+    meta.innerHTML =
+      `<p class="card-meta">${escapeHtml(g.meta?.grade || "")} · ${escapeHtml(g.meta?.curriculum || "")}</p>` +
+      `<p class="card-meta">용어 규정 ${g.terms?.length || 0} · 출제 불가 ${g.forbidden?.length || 0} · 추가 출제 가능 ${g.extra?.length || 0} · 난이도 상 전용 ${g.advanced?.length || 0}</p>`;
+    card.appendChild(meta);
+
+    const actions = document.createElement("div");
+    actions.className = "card-actions";
+    if (u.builtin) {
+      // 내장 단원: 수정 불가, 복제만 가능 (스펙 §4)
+      actions.appendChild(makeBtn("복제", () => openGuidelineForm("clone", u.id)));
+    } else {
+      actions.appendChild(makeBtn("수정", () => openGuidelineForm("edit", u.id)));
+      actions.appendChild(makeBtn("삭제", () => deleteGuidelineCard(u.id, g.meta?.unit || u.id)));
+      actions.appendChild(makeBtn("내보내기", () => exportGuideline(u.id)));
+    }
+    card.appendChild(actions);
+
     list.appendChild(card);
   });
+}
+
+function makeBtn(label, onClick) {
+  const b = document.createElement("button");
+  b.textContent = label;
+  b.addEventListener("click", onClick);
+  return b;
 }
 
 // ---------- 탭 1: 문항 생성 ----------
@@ -412,11 +444,137 @@ function renderHistory() {
   panel.appendChild(ul);
 }
 
+// ---------- 탭 3: 가이드라인 CRUD ----------
+let glEditingId = null; // edit 모드일 때 대상 id, 그 외 null(신규)
+
+const lines2arr = (s) => (s || "").split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+const arr2lines = (a) => (a || []).join("\n");
+
+// mode: "new" | "edit" | "clone"
+function openGuidelineForm(mode, sourceId) {
+  const title = $("#gl-modal-title");
+  const status = $("#gl-status");
+  status.textContent = "";
+  status.className = "status";
+
+  let g = { meta: {}, terms: [], forbidden: [], extra: [], advanced: [] };
+  if (mode === "edit" || mode === "clone") g = state.guidelines[sourceId] || g;
+
+  const unit = mode === "clone" ? (g.meta?.unit || "") + " (복제)" : (g.meta?.unit || "");
+  glEditingId = mode === "edit" ? sourceId : null;
+  title.textContent = mode === "edit" ? "가이드라인 수정" : mode === "clone" ? "가이드라인 복제" : "새 가이드라인 만들기";
+
+  $("#gl-grade").value = g.meta?.grade || "";
+  $("#gl-unit").value = unit;
+  $("#gl-curriculum").value = g.meta?.curriculum || "2022 개정";
+  $("#gl-terms").value = arr2lines(g.terms);
+  $("#gl-forbidden").value = arr2lines(g.forbidden);
+  $("#gl-extra").value = arr2lines(g.extra);
+  $("#gl-advanced").value = arr2lines(g.advanced);
+
+  $("#guideline-modal").showModal();
+}
+
+function saveGuidelineForm() {
+  const status = $("#gl-status");
+  const unit = $("#gl-unit").value.trim();
+  if (!unit) {
+    status.textContent = "단원명은 필수입니다.";
+    status.className = "status error";
+    return;
+  }
+  const g = {
+    id: glEditingId || "user-" + Date.now(),
+    meta: {
+      grade: $("#gl-grade").value.trim(),
+      unit,
+      curriculum: $("#gl-curriculum").value.trim() || "2022 개정"
+    },
+    terms: lines2arr($("#gl-terms").value),
+    forbidden: lines2arr($("#gl-forbidden").value),
+    extra: lines2arr($("#gl-extra").value),
+    advanced: lines2arr($("#gl-advanced").value)
+  };
+
+  if (glEditingId) Store.updateUserGuideline(g);
+  else Store.addUserGuideline(g);
+
+  $("#guideline-modal").close();
+  Store.setSelectedUnit(g.id);
+  loadUnits().then(() => {
+    $("#unit-select").value = g.id;
+  });
+}
+
+function deleteGuidelineCard(id, name) {
+  if (!window.confirm(`'${name}' 가이드라인을 삭제할까요? 되돌릴 수 없습니다.`)) return;
+  Store.deleteUserGuideline(id);
+  if (Store.getSelectedUnit() === id) Store.setSelectedUnit("");
+  loadUnits();
+}
+
+function exportGuideline(id) {
+  const g = state.guidelines[id];
+  if (!g) return;
+  const blob = new Blob([JSON.stringify(g, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = id + ".json";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function handleImportFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try {
+      data = JSON.parse(reader.result);
+    } catch {
+      window.alert("가져오기 실패: JSON 형식이 올바르지 않습니다.");
+      return;
+    }
+    if (!data || typeof data !== "object" || Array.isArray(data) || !data.meta || !data.meta.unit) {
+      window.alert("가져오기 실패: 가이드라인 형식이 아닙니다 (meta.unit 필요).");
+      return;
+    }
+    // 사용자 가이드라인으로 편입 — id 충돌/내장 id 회피
+    const builtinIds = state.units.filter((u) => u.builtin).map((u) => u.id);
+    const userIds = Store.getUserGuidelines().map((x) => x.id);
+    if (!data.id || builtinIds.includes(data.id) || userIds.includes(data.id)) {
+      data.id = "user-" + Date.now();
+    }
+    data.terms = data.terms || [];
+    data.forbidden = data.forbidden || [];
+    data.extra = data.extra || [];
+    data.advanced = data.advanced || [];
+    Store.addUserGuideline(data);
+    loadUnits();
+    window.alert(`'${data.meta.unit}' 가이드라인을 가져왔습니다.`);
+  };
+  reader.readAsText(file);
+}
+
+function initGuidelines() {
+  $("#new-guideline-btn").addEventListener("click", () => openGuidelineForm("new"));
+  $("#gl-save").addEventListener("click", saveGuidelineForm);
+  $("#gl-close").addEventListener("click", () => $("#guideline-modal").close());
+
+  const fileInput = $("#import-file");
+  $("#import-guideline-btn").addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files[0]) handleImportFile(fileInput.files[0]);
+    fileInput.value = ""; // 같은 파일 재선택 허용
+  });
+}
+
 // ---------- 초기화 ----------
 document.addEventListener("DOMContentLoaded", () => {
   initTabs();
   initSettings();
   initGenerate();
   initReview();
+  initGuidelines();
   loadUnits();
 });
