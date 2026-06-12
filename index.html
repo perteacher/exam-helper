@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>출제연구소 — 과학 문항 출제 도우미</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1 class="logo">출제연구소</h1>
+    <select id="unit-select" aria-label="단원 선택">
+      <option>단원 불러오는 중...</option>
+    </select>
+    <button id="settings-btn" title="설정" aria-label="설정">⚙</button>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="tab-generate">문항 생성</button>
+    <button class="tab-btn" data-tab="tab-review">문항 검토</button>
+    <button class="tab-btn" data-tab="tab-guidelines">가이드라인 관리</button>
+  </nav>
+
+  <main>
+    <!-- 탭 1: 문항 생성 -->
+    <section id="tab-generate" class="tab-panel active">
+      <div class="form-grid">
+        <label>문항 유형
+          <select id="gen-type">
+            <option>선다형</option>
+            <option>합답형 (ㄱㄴㄷ)</option>
+            <option>서답형</option>
+            <option>서술형</option>
+          </select>
+        </label>
+        <label>난이도
+          <select id="gen-difficulty">
+            <option>하</option>
+            <option selected>중</option>
+            <option>상</option>
+          </select>
+        </label>
+        <label>출제 개념 (선택)
+          <input type="text" id="gen-concept" placeholder="예: 가로막 운동과 압력 변화" />
+        </label>
+        <label>문항 수
+          <input type="number" id="gen-count" min="1" max="5" value="1" />
+        </label>
+      </div>
+      <button id="gen-btn" class="primary" disabled title="M2에서 구현 예정">문항 생성 (준비 중)</button>
+      <div id="gen-output" class="output-area">
+        <p class="placeholder">생성된 문항 카드가 여기에 표시됩니다. (M2에서 구현)</p>
+      </div>
+      <aside id="gen-history" class="history-panel">
+        <h2>생성 이력</h2>
+        <p class="placeholder">최근 50개 이력이 여기에 표시됩니다. (M2에서 구현)</p>
+      </aside>
+    </section>
+
+    <!-- 탭 2: 문항 검토 -->
+    <section id="tab-review" class="tab-panel">
+      <label class="block-label">검토할 문항 붙여넣기
+        <textarea id="review-input" rows="8" placeholder="발문·보기·정답을 붙여넣으세요."></textarea>
+      </label>
+      <label class="check-label">
+        <input type="checkbox" id="review-devil" /> 악마의 변호인 모드 (이의제기 시뮬레이션)
+      </label>
+      <button id="review-btn" class="primary" disabled title="M3에서 구현 예정">검토하기 (준비 중)</button>
+      <div id="review-output" class="output-area">
+        <p class="placeholder">오류 없음/오류 있음 판정 결과가 여기에 표시됩니다. (M3에서 구현)</p>
+      </div>
+    </section>
+
+    <!-- 탭 3: 가이드라인 관리 -->
+    <section id="tab-guidelines" class="tab-panel">
+      <div class="toolbar">
+        <button disabled title="M4에서 구현 예정">새 가이드라인 만들기 (준비 중)</button>
+        <button disabled title="M4에서 구현 예정">JSON 가져오기 (준비 중)</button>
+      </div>
+      <div id="guideline-list"></div>
+    </section>
+  </main>
+
+  <!-- 설정 모달 -->
+  <dialog id="settings-modal">
+    <h2>설정</h2>
+    <label class="block-label">Anthropic API 키
+      <input type="password" id="api-key-input" placeholder="sk-ant-..." autocomplete="off" />
+    </label>
+    <label class="block-label">모델
+      <select id="model-select"></select>
+    </label>
+    <p class="notice">키는 이 브라우저에만 저장되며 서버로 전송되지 않습니다.
+      <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">API 키 발급받기</a>
+    </p>
+    <p id="settings-status" class="status"></p>
+    <div class="modal-actions">
+      <button id="settings-save" class="primary">저장</button>
+      <button id="settings-close">닫기</button>
+    </div>
+  </dialog>
+
+  <footer class="app-footer">
+    본 도구의 생성 결과는 참고용입니다. 최종 출제 책임은 출제 교사에게 있으며, 모든 문항은 교과서와 대조 검토하십시오.
+  </footer>
+
+  <script src="js/store.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/prompt.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
