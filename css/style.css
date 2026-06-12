@@ -309,6 +309,25 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 /* 로딩 상태 */
 #gen-btn:disabled, #review-btn:disabled { opacity: 0.6; cursor: progress; }
 
+/* 에러 박스 (빨강) */
+.error-box {
+  background: rgba(192, 57, 43, 0.08);
+  border: 1px solid var(--error);
+  border-left: 4px solid var(--error);
+  border-radius: 6px;
+  padding: 10px 14px;
+  color: var(--error);
+  font-size: 0.9rem;
+}
+.q-error { margin-bottom: 12px; }
+
+/* 결과 영역 아래 주의 문구 */
+.result-caution {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 8px 2px 0;
+}
+
 /* 생성 이력 목록 */
 .history-list { list-style: none; margin: 0; padding: 0; }
 .history-list li { margin-bottom: 6px; }

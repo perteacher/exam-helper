@@ -240,7 +240,7 @@ async function runGeneration(input) {
     Store.addHistory({ ...meta, parsed });
     renderHistory();
   } catch (e) {
-    output.innerHTML = '<p class="placeholder">' + (e.message || "요청에 실패했습니다.") + "</p>";
+    showError(output, e.message || "요청에 실패했습니다.");
   } finally {
     btn.disabled = false;
     btn.textContent = prevLabel;
@@ -322,10 +322,8 @@ function buildQuestionCard(q, num, meta) {
 
   const regenBtn = document.createElement("button");
   regenBtn.textContent = "재생성";
-  regenBtn.addEventListener("click", () => {
-    // 이 카드의 파라미터로 1문항 재생성
-    runGeneration({ ...(meta?.input || readGenInput()), count: 1 });
-  });
+  // 이 카드만 같은 조건으로 재생성하여 제자리 교체 (다른 카드 유지)
+  regenBtn.addEventListener("click", () => regenerateCard(card, num, meta));
 
   const reviewBtn = document.createElement("button");
   reviewBtn.textContent = "이 문항 검토하기";
@@ -343,6 +341,61 @@ function buildQuestionCard(q, num, meta) {
 
 function section(label, value) {
   return `<div class="q-sec"><span class="q-label">${label}</span><div class="q-text">${escapeHtml(value)}</div></div>`;
+}
+
+// 단일 문항 생성 (재생성용) — 파싱 결과 반환
+async function generateQuestions(input) {
+  const system = buildGenerationPrompt(currentGuideline(), input);
+  const model = Store.getModel() || DEFAULT_MODEL;
+  const res = await callClaude({
+    apiKey: Store.getApiKey(),
+    model,
+    system,
+    messages: [{ role: "user", content: "문항을 생성해 주세요." }]
+  });
+  const text = res?.content?.map((b) => b.text || "").join("") || "";
+  return parseGenerationResponse(text);
+}
+
+// 카드 1개만 같은 조건으로 재생성해 제자리 교체 (나머지 카드 유지)
+async function regenerateCard(card, num, meta) {
+  if (!Store.getApiKey()) { showCardError(card, "API 키가 설정되지 않았습니다. ⚙ 설정에서 키를 먼저 입력해 주세요."); return; }
+  if (!currentGuideline()) { showCardError(card, "단원을 먼저 선택해 주세요."); return; }
+
+  const buttons = card.querySelectorAll(".q-actions button");
+  const regenBtn = [...buttons].find((b) => b.textContent.startsWith("재생성"));
+  buttons.forEach((b) => (b.disabled = true));
+  if (regenBtn) regenBtn.textContent = "재생성 중...";
+  card.querySelector(".q-error")?.remove();
+
+  try {
+    const parsed = await generateQuestions({ ...(meta?.input || readGenInput()), count: 1 });
+    const q = parsed.ok ? parsed.data?.questions?.[0] : null;
+    if (q) {
+      card.replaceWith(buildQuestionCard(q, num, meta));
+      return;
+    }
+    showCardError(card, "재생성 결과를 카드로 변환하지 못했습니다.");
+  } catch (e) {
+    showCardError(card, e.message || "재생성에 실패했습니다.");
+  }
+  buttons.forEach((b) => (b.disabled = false));
+  if (regenBtn) regenBtn.textContent = "재생성";
+}
+
+// 카드 안에 인라인 에러 박스 표시
+function showCardError(card, msg) {
+  card.querySelector(".q-error")?.remove();
+  const div = document.createElement("div");
+  div.className = "error-box q-error";
+  div.textContent = msg;
+  card.insertBefore(div, card.firstChild);
+}
+
+// 출력 영역에 에러 박스 표시 (빨강)
+function showError(el, msg) {
+  el.innerHTML = '<div class="error-box"></div>';
+  el.firstChild.textContent = msg;
 }
 
 // ---------- 탭 2: 문항 검토 ----------
@@ -403,7 +456,7 @@ async function runReview() {
     const text = res?.content?.map((b) => b.text || "").join("") || "";
     renderReviewResult(text, devil);
   } catch (e) {
-    output.innerHTML = '<p class="placeholder">' + (e.message || "요청에 실패했습니다.") + "</p>";
+    showError(output, e.message || "요청에 실패했습니다.");
   } finally {
     btn.disabled = false;
     btn.textContent = "검토하기";

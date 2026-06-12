@@ -36,7 +36,7 @@
           <li>③ [문항 생성] 클릭</li>
         </ol>
         <p class="onboarding-note">붙여넣은 문항을 검토하려면 상단 <strong>문항 검토</strong> 탭을 이용하세요.</p>
-        <p class="onboarding-note">API 키는 이 브라우저에만 저장되며 서버로 전송되지 않습니다.</p>
+        <p class="onboarding-note">API 키는 이 브라우저에만 저장되며 서버로 전송되지 않습니다. 사용량은 본인 Anthropic API 계정에 과금됩니다.</p>
       </div>
       <div class="form-grid">
         <label>문항 유형
@@ -65,6 +65,7 @@
       <div id="gen-output" class="output-area">
         <p class="placeholder">생성된 문항 카드가 여기에 표시됩니다.</p>
       </div>
+      <p class="result-caution">⚠ 생성 결과는 참고용입니다. 정답·해설을 교과서와 대조해 최종 확인하세요.</p>
       <aside id="gen-history" class="history-panel">
         <h2>생성 이력</h2>
         <p class="placeholder">아직 생성 이력이 없습니다.</p>
@@ -83,6 +84,7 @@
       <div id="review-output" class="output-area">
         <p class="placeholder">오류 없음/오류 있음 판정 결과가 여기에 표시됩니다.</p>
       </div>
+      <p class="result-caution">⚠ 검토 결과는 참고용입니다. 최종 판단과 출제 책임은 출제 교사에게 있습니다.</p>
     </section>
 
     <!-- 탭 3: 가이드라인 관리 -->
@@ -108,6 +110,7 @@
     <p class="notice">키는 이 브라우저에만 저장되며 서버로 전송되지 않습니다.
       <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">API 키 발급받기</a>
     </p>
+    <p class="notice">사용량은 본인 Anthropic API 계정에 과금됩니다.</p>
     <p id="settings-status" class="status"></p>
     <div class="modal-actions">
       <button id="settings-save" class="primary">저장</button>
