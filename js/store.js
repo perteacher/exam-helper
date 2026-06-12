@@ -23,5 +23,23 @@ const Store = {
     } catch {
       return [];
     }
+  },
+
+  getHistory() {
+    try {
+      return JSON.parse(localStorage.getItem(this.KEYS.history)) || [];
+    } catch {
+      return [];
+    }
+  },
+
+  // 생성 이력 저장 (최근 50개 유지, 오래된 것부터 제거). 추가한 항목 반환.
+  addHistory(entry) {
+    const item = { id: Date.now(), ...entry };
+    const list = this.getHistory();
+    list.unshift(item);
+    const trimmed = list.slice(0, 50);
+    localStorage.setItem(this.KEYS.history, JSON.stringify(trimmed));
+    return item;
   }
 };

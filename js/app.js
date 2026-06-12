@@ -4,6 +4,12 @@ const state = {
   guidelines: {}    // id → 가이드라인 JSON
 };
 
+// 현재 선택된 가이드라인 JSON 반환 (없으면 null)
+function currentGuideline() {
+  const id = Store.getSelectedUnit() || $("#unit-select")?.value;
+  return id ? state.guidelines[id] || null : null;
+}
+
 const $ = (sel) => document.querySelector(sel);
 
 // ---------- 탭 전환 ----------
@@ -123,9 +129,213 @@ function renderGuidelineList() {
   });
 }
 
+// ---------- 탭 1: 문항 생성 ----------
+function readGenInput() {
+  return {
+    type: $("#gen-type").value,
+    difficulty: $("#gen-difficulty").value,
+    concept: $("#gen-concept").value.trim(),
+    count: Math.min(5, Math.max(1, parseInt($("#gen-count").value, 10) || 1))
+  };
+}
+
+function initGenerate() {
+  const btn = $("#gen-btn");
+  btn.disabled = false;
+  btn.removeAttribute("title");
+  btn.textContent = "문항 생성";
+  btn.addEventListener("click", () => runGeneration(readGenInput()));
+  renderHistory();
+}
+
+// 단일 문항 평문 텍스트 (복사·검토 전달용)
+function questionToText(q) {
+  const parts = [];
+  parts.push(q.stem || "");
+  if (Array.isArray(q.choices) && q.choices.length) parts.push(q.choices.join("\n"));
+  if (q.answer) parts.push("정답: " + q.answer);
+  if (q.explanation) parts.push("해설: " + q.explanation);
+  return parts.filter(Boolean).join("\n");
+}
+
+async function runGeneration(input) {
+  const output = $("#gen-output");
+  const btn = $("#gen-btn");
+
+  const apiKey = Store.getApiKey();
+  if (!apiKey) {
+    output.innerHTML = '<p class="placeholder">API 키가 설정되지 않았습니다. 우측 상단 ⚙ 설정에서 키를 먼저 입력해 주세요.</p>';
+    return;
+  }
+
+  const guideline = currentGuideline();
+  if (!guideline) {
+    output.innerHTML = '<p class="placeholder">단원(가이드라인)을 먼저 선택해 주세요.</p>';
+    return;
+  }
+
+  const system = buildGenerationPrompt(guideline, input);
+  const model = Store.getModel() || DEFAULT_MODEL;
+
+  btn.disabled = true;
+  const prevLabel = btn.textContent;
+  btn.textContent = "생성 중...";
+  output.innerHTML = '<p class="placeholder">문항을 생성하고 있습니다...</p>';
+
+  try {
+    const res = await callClaude({
+      apiKey,
+      model,
+      system,
+      messages: [{ role: "user", content: "문항을 생성해 주세요." }]
+    });
+    const text = res?.content?.map((b) => b.text || "").join("") || "";
+    const parsed = parseGenerationResponse(text);
+
+    const meta = { input, guidelineId: guideline.id, unitLabel: guideline.meta?.unit || guideline.id };
+    renderGenerationResult(parsed, meta);
+
+    Store.addHistory({ ...meta, parsed });
+    renderHistory();
+  } catch (e) {
+    output.innerHTML = '<p class="placeholder">' + (e.message || "요청에 실패했습니다.") + "</p>";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = prevLabel;
+  }
+}
+
+// 파싱 결과 → 카드 렌더링 (실패 시 원문 <pre> 폴백)
+function renderGenerationResult(parsed, meta) {
+  const output = $("#gen-output");
+  output.innerHTML = "";
+
+  if (!parsed.ok) {
+    const pre = document.createElement("pre");
+    pre.className = "raw-fallback";
+    pre.textContent = parsed.raw;
+    output.appendChild(pre);
+    return;
+  }
+
+  const questions = Array.isArray(parsed.data?.questions) ? parsed.data.questions : [];
+  if (!questions.length) {
+    output.innerHTML = '<p class="placeholder">생성된 문항이 없습니다.</p>';
+    return;
+  }
+  questions.forEach((q, i) => output.appendChild(buildQuestionCard(q, i + 1, meta)));
+}
+
+function buildQuestionCard(q, num, meta) {
+  const card = document.createElement("div");
+  card.className = "q-card";
+
+  const head = document.createElement("div");
+  head.className = "q-head";
+  head.innerHTML = `<strong>문항 ${num}</strong>` +
+    `<span class="badge">${q.type || ""} · ${q.difficulty || ""}</span>`;
+  card.appendChild(head);
+
+  const sections = [];
+  sections.push(section("발문", q.stem || ""));
+
+  if (Array.isArray(q.choices) && q.choices.length) {
+    const choicesHtml = q.choices.map((c) => `<li>${escapeHtml(c)}</li>`).join("");
+    sections.push(`<div class="q-sec"><span class="q-label">보기</span><ul class="q-choices">${choicesHtml}</ul></div>`);
+  }
+
+  sections.push(section("정답", q.answer || ""));
+  sections.push(section("해설", q.explanation || ""));
+
+  const di = q.distractor_intent || {};
+  const diKeys = Object.keys(di);
+  if (diKeys.length) {
+    const items = diKeys.map((k) => `<li><strong>${escapeHtml(k)}</strong> ${escapeHtml(di[k])}</li>`).join("");
+    sections.push(`<div class="q-sec"><span class="q-label">오답별 출제 의도·오개념</span><ul class="q-distractors">${items}</ul></div>`);
+  }
+
+  const body = document.createElement("div");
+  body.innerHTML = sections.join("");
+  card.appendChild(body);
+
+  const actions = document.createElement("div");
+  actions.className = "q-actions";
+
+  const copyBtn = document.createElement("button");
+  copyBtn.textContent = "복사";
+  copyBtn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(questionToText(q));
+      copyBtn.textContent = "복사됨";
+      setTimeout(() => (copyBtn.textContent = "복사"), 1500);
+    } catch {
+      copyBtn.textContent = "복사 실패";
+      setTimeout(() => (copyBtn.textContent = "복사"), 1500);
+    }
+  });
+
+  const regenBtn = document.createElement("button");
+  regenBtn.textContent = "재생성";
+  regenBtn.addEventListener("click", () => {
+    // 이 카드의 파라미터로 1문항 재생성
+    runGeneration({ ...(meta?.input || readGenInput()), count: 1 });
+  });
+
+  const reviewBtn = document.createElement("button");
+  reviewBtn.textContent = "이 문항 검토하기";
+  reviewBtn.addEventListener("click", () => {
+    const ta = $("#review-input");
+    if (ta) ta.value = questionToText(q);
+    const tabBtn = document.querySelector('.tab-btn[data-tab="tab-review"]');
+    if (tabBtn) tabBtn.click();
+  });
+
+  actions.append(copyBtn, regenBtn, reviewBtn);
+  card.appendChild(actions);
+  return card;
+}
+
+function section(label, value) {
+  return `<div class="q-sec"><span class="q-label">${label}</span><div class="q-text">${escapeHtml(value)}</div></div>`;
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+// ---------- 생성 이력 패널 ----------
+function renderHistory() {
+  const panel = $("#gen-history");
+  const list = Store.getHistory();
+  panel.innerHTML = "<h2>생성 이력</h2>";
+  if (!list.length) {
+    panel.insertAdjacentHTML("beforeend", '<p class="placeholder">아직 생성 이력이 없습니다.</p>');
+    return;
+  }
+  const ul = document.createElement("ul");
+  ul.className = "history-list";
+  list.forEach((item) => {
+    const li = document.createElement("li");
+    const inp = item.input || {};
+    const time = new Date(item.id).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    li.innerHTML = `<button class="history-item">${escapeHtml(item.unitLabel || "")}` +
+      ` · ${escapeHtml(inp.type || "")} · ${escapeHtml(inp.difficulty || "")}` +
+      `<span class="history-time">${time}</span></button>`;
+    li.querySelector("button").addEventListener("click", () => {
+      renderGenerationResult(item.parsed, { input: inp, guidelineId: item.guidelineId, unitLabel: item.unitLabel });
+    });
+    ul.appendChild(li);
+  });
+  panel.appendChild(ul);
+}
+
 // ---------- 초기화 ----------
 document.addEventListener("DOMContentLoaded", () => {
   initTabs();
   initSettings();
+  initGenerate();
   loadUnits();
 });

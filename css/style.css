@@ -149,6 +149,86 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 .card-meta { color: var(--muted); font-size: 0.85rem; margin: 6px 0 0; }
 
+/* 문항 카드 (탭 1) */
+.q-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.q-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.q-sec { margin-bottom: 12px; }
+.q-label {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: rgba(16, 58, 74, 0.08);
+  border-radius: 4px;
+  padding: 2px 8px;
+  margin-bottom: 4px;
+}
+.q-text { white-space: pre-wrap; }
+.q-choices { margin: 4px 0 0; padding-left: 1.2em; }
+.q-choices li { list-style: none; margin: 2px 0; }
+.q-distractors { margin: 4px 0 0; padding-left: 1.2em; }
+.q-distractors li { margin: 4px 0; font-size: 0.9rem; color: var(--muted); }
+.q-distractors strong { color: var(--text); margin-right: 4px; }
+.q-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.q-actions button {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.q-actions button:hover { background: var(--bg); border-color: var(--accent); }
+.raw-fallback {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+/* 로딩 상태 */
+#gen-btn:disabled { opacity: 0.6; cursor: progress; }
+
+/* 생성 이력 목록 */
+.history-list { list-style: none; margin: 0; padding: 0; }
+.history-list li { margin-bottom: 6px; }
+.history-item {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.history-item:hover { border-color: var(--accent); background: var(--bg); }
+.history-time { color: var(--muted); font-size: 0.78rem; white-space: nowrap; }
+
 /* 설정 모달 */
 dialog {
   border: none;
